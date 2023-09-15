@@ -1,7 +1,9 @@
+use std::io::Write;
 use std::{f64::consts::PI, fs::File, io};
-use std::io::{Write};
 
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::{distributions::Standard, prelude::Distribution, thread_rng, Rng};
+use rayon::prelude::*;
 
 use crate::fk::ee_pos;
 
@@ -144,6 +146,28 @@ fn evaluate_population(
     return fitness;
 }
 
+fn evaluate_population_par(
+    population: &Vec<Vec<Chromosome>>,
+    test_angles: &[(f64, f64, f64)],
+) -> Vec<f64> {
+
+    let fitness = population.par_iter().map(|individual| {
+        let mut error = 0.0;
+        for (th_1, th_2, th_3) in test_angles {
+            let (x, y, z) = ee_pos(*th_1, *th_2, *th_3);
+
+            let mut regs = init_registers(x, y, z);
+            execute(&mut regs, individual);
+
+            let (x_p, y_p, z_p) = ee_pos(regs[2], regs[3], regs[4]);
+            error += (x - x_p).powi(2) + (y - y_p).powi(2) + (z - z_p).powi(2);
+        }
+        return -error;
+    });
+
+    return fitness.collect();
+}
+
 fn generate_test_angles(steps1: usize, steps2: usize, steps3: usize) -> Vec<(f64, f64, f64)> {
     let mut output = Vec::with_capacity(steps1 * steps2 * steps3);
 
@@ -162,7 +186,11 @@ fn generate_test_angles(steps1: usize, steps2: usize, steps3: usize) -> Vec<(f64
     return output;
 }
 
-fn tournament_select(sorted_fitness_with_i: &Vec<(f64, usize)>, t_size: usize, p_tour: f64) -> usize {
+fn tournament_select(
+    sorted_fitness_with_i: &Vec<(f64, usize)>,
+    t_size: usize,
+    p_tour: f64,
+) -> usize {
     let mut i = 0;
     while thread_rng().gen::<f64>() < p_tour && i < t_size && i < sorted_fitness_with_i.len() {
         i += 1;
@@ -221,17 +249,31 @@ fn create_offspring(
     return (child1, child2);
 }
 
+fn clamped_interp(x: f64, from: f64, to: f64) -> f64 {
+    return ((to - x) / to + from).clamp(0.0, 1.0);
+}
+
 fn main() -> io::Result<()> {
-    const GENERATIONS: usize = 100000;
-    const N: usize = 100;
+    const GENERATIONS: usize = 100;
+    const N: usize = 10000;
     let mut p = init_population(N, 10, 100);
 
     let test_angles = generate_test_angles(10, 10, 10);
 
     let mut historical_fitness = Vec::with_capacity(GENERATIONS);
 
+    let bar = ProgressBar::new(GENERATIONS as u64);
+    bar.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise}/{eta_precise}] {bar:40.cyan/blue} {pos:>5}/{len:5} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-"),
+    );
+
     for g in 0..GENERATIONS {
-        let fitness = evaluate_population(&p, &test_angles);
+        bar.inc(1);
+        let fitness = evaluate_population_par(&p, &test_angles);
         let mut fit_with_i: Vec<(f64, usize)> = fitness.into_iter().zip(0..N).collect();
         fit_with_i.sort_by(|a, b| {
             return b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal);
@@ -239,21 +281,32 @@ fn main() -> io::Result<()> {
 
         let mut new_pop = Vec::with_capacity(N);
 
-        for _ in 0..N/2 {
+        let paired_pop: Vec<(Vec<Chromosome>,Vec<Chromosome>)> = (0..N / 2).into_par_iter().map(|_| {
             let parent1 = &p[tournament_select(&fit_with_i, 5, 0.7)];
             let parent2 = &p[tournament_select(&fit_with_i, 5, 0.7)];
 
-            let (child1, child2) = create_offspring(parent1, parent2, 0.25, 0.1);
+            return create_offspring(
+                parent1,
+                parent2,
+                clamped_interp(g as f64, 0.25, GENERATIONS as f64),
+                clamped_interp(g as f64, 0.1, GENERATIONS as f64),
+            );
+        }).collect();
 
-            new_pop.push(child1);
-            new_pop.push(child2);
+        for pair in paired_pop {
+            new_pop.push(pair.0);
+            new_pop.push(pair.1);
         }
 
         new_pop[0] = p[fit_with_i[0].1].clone();
         p = new_pop;
         historical_fitness.push(fit_with_i[0].0);
-        println!("Gen: {}/{} Max fitness: {}", g+1, GENERATIONS, fit_with_i[0].0);
+        bar.set_message(format!(
+            "Mean error: {:.5} cm",
+            (fit_with_i[0].0 / (test_angles.len() as f64) * (-100.0))
+        ));
     }
+    bar.finish();
 
     let mut log_file = File::create("log.txt")?;
     for x in &historical_fitness {
@@ -263,7 +316,14 @@ fn main() -> io::Result<()> {
 
     let mut genome_file = File::create("genome.txt")?;
     for x in &p[0] {
-        write!(genome_file, "{}, {}, {}, {}, ", op_to_num(x.operator), x.dest, x.src1, x.src2)?;
+        write!(
+            genome_file,
+            "{}, {}, {}, {}, ",
+            op_to_num(x.operator),
+            x.dest,
+            x.src1,
+            x.src2
+        )?;
     }
     writeln!(genome_file)?;
 
