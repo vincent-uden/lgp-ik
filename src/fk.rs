@@ -1,12 +1,12 @@
 // static L1: f64 = 0.055;
-static L2: f64 = 0.315;
-static L3: f64 = 0.045;
-static L4: f64 = 0.108;
-static L5: f64 = 0.005;
-static L6: f64 = 0.034;
-static L7: f64 = 0.015;
-static L8: f64 = 0.088;
-static L9: f64 = 0.204;
+pub static L2: f64 = 0.315;
+pub static L3: f64 = 0.045;
+pub static L4: f64 = 0.108;
+pub static L5: f64 = 0.005;
+pub static L6: f64 = 0.034;
+pub static L7: f64 = 0.015;
+pub static L8: f64 = 0.088;
+pub static L9: f64 = 0.204;
 
 fn a_1_to_0(th_1: f64, x: (f64, f64, f64)) -> (f64, f64, f64) {
     return (
