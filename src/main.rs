@@ -1,4 +1,3 @@
-use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::{f64::consts::PI, fs::File, io};
@@ -7,15 +6,20 @@ use clap::{ArgAction, Parser, Subcommand};
 use fk::ee_pos;
 use indicatif::{ProgressBar, ProgressStyle};
 use lgp::{execute, init_registers, num_to_op, CONST_REGS};
-use rayon::prelude::*;
 
 use crate::lgp::{
     create_offspring, evaluate_population_par, init_population, op_to_num, tournament_select,
-    Chromosome,
+    Chromosome, fitness_uniform_select,
 };
 
 mod fk;
 mod lgp;
+
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum LGPSelection {
+    TOURNAMENT,
+    FUSS,
+}
 
 #[derive(Parser)]
 #[command(
@@ -35,6 +39,9 @@ enum Commands {
     Train {
         #[clap(short, long)]
         generations: Option<usize>,
+        #[clap(short, long)]
+        population: Option<usize>,
+        selection: Option<LGPSelection>,
     },
     IK {
         x: f64,
@@ -62,17 +69,17 @@ fn generate_test_angles(steps1: usize, steps2: usize, steps3: usize) -> Vec<(f64
     return output;
 }
 
-fn clamped_interp(x: f64, from: f64, to: f64) -> f64 {
-    return ((to - x) / to + from).clamp(0.0, 1.0);
+fn smooth_step(x: f64, from: f64, to: f64) -> f64 {
+    let out = (x - from) / (to - from);
+    return out * out * (3.0 - 2.0 * out);
 }
 
-fn train(cli_gens: Option<usize>) -> io::Result<()> {
-    let gens: usize = match cli_gens {
-        Some(g) => g,
-        None => 500,
-    };
-    const N: usize = 1000;
-    let mut p = init_population(N, 10, 100);
+fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<LGPSelection>) -> io::Result<()> {
+    let gens = cli_gens.unwrap_or(500);
+    let selection = cli_selection.unwrap_or(LGPSelection::TOURNAMENT);
+    let n = cli_pop.unwrap_or(1000);
+
+    let mut p = init_population(n, 10, 100);
 
     let test_angles = generate_test_angles(10, 10, 10);
 
@@ -90,24 +97,30 @@ fn train(cli_gens: Option<usize>) -> io::Result<()> {
     for g in 0..gens {
         bar.inc(1);
         let fitness = evaluate_population_par(&p, &test_angles);
-        let mut fit_with_i: Vec<(f64, usize)> = fitness.into_iter().zip(0..N).collect();
+        let mut fit_with_i: Vec<(f64, usize)> = fitness.into_iter().zip(0..n).collect();
         fit_with_i.sort_by(|a, b| {
             return b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal);
         });
 
-        let mut new_pop = Vec::with_capacity(N);
+        let mut new_pop = Vec::with_capacity(n);
 
-        let paired_pop: Vec<(Vec<Chromosome>, Vec<Chromosome>)> = (0..N / 2)
-            .into_par_iter()
+        let paired_pop: Vec<(Vec<Chromosome>, Vec<Chromosome>)> = (0..n / 2)
+            //.into_par_iter()
             .map(|_| {
-                let parent1 = &p[tournament_select(&fit_with_i, 5, 0.8)];
-                let parent2 = &p[tournament_select(&fit_with_i, 5, 0.8)];
+                let parent1 = match selection {
+                    LGPSelection::TOURNAMENT => &p[tournament_select(&fit_with_i, 5, 0.8)],
+                    LGPSelection::FUSS => &p[fitness_uniform_select(&fit_with_i)],
+                };
+                let parent2 = match selection {
+                    LGPSelection::TOURNAMENT => &p[tournament_select(&fit_with_i, 5, 0.8)],
+                    LGPSelection::FUSS => &p[fitness_uniform_select(&fit_with_i)],
+                };
 
                 return create_offspring(
                     parent1,
                     parent2,
-                    clamped_interp(g as f64, 0.25, gens as f64),
-                    clamped_interp(g as f64, 0.1, gens as f64),
+                    smooth_step(g as f64 / gens as f64, 0.9, 0.25),
+                    smooth_step(g as f64 / gens as f64, 0.8, 0.05),
                 );
             })
             .collect();
@@ -211,9 +224,28 @@ fn main() -> io::Result<()> {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Train { generations } => train(generations)?,
+        Commands::Train { generations, population, selection } => train(generations, population, selection)?,
         Commands::IK { x, y, z, genome } => ik(x, y, z, genome)?,
     }
 
     return Ok(());
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lgp::binary_search;
+
+    #[test]
+    fn binary_search_finds_closest_match() {
+        let mut inp: Vec<(f64, usize)> = vec![];
+        for x in 0..10 {
+            inp.push((1.0 - (x as f64 / 10.0), x));
+        }
+
+        assert_eq!(binary_search(&inp, 0.0).1, 9);
+        assert_eq!(binary_search(&inp, 10.0).1, 0);
+        assert_eq!(binary_search(&inp, 0.2).1, 8);
+        assert_eq!(binary_search(&inp, 0.96).1, 0);
+        assert_eq!(binary_search(&inp, 0.94).1, 1);
+    }
 }

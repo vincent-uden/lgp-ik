@@ -96,7 +96,7 @@ pub(crate) fn init_registers(th_1: f64, th_2: f64, th_3: f64) -> Vec<f64> {
     output.push(th_1);
     output.push(th_2);
     output.push(th_3);
-    for _ in 5..(CONST_REGS + VAR_REGS) {
+    for _ in (CONST_REGS)..(CONST_REGS + VAR_REGS - 3) {
         output.push(0.0);
     }
     return output;
@@ -161,6 +161,54 @@ pub(crate) fn tournament_select(
         i += 1;
     }
     return sorted_fitness_with_i[i].1;
+}
+
+pub(crate) fn binary_search(sorted_fitness_with_i: &Vec<(f64, usize)>, target_f: f64) -> &(f64, usize) {
+    let mut lo = 0;
+    let mut hi = sorted_fitness_with_i.len() - 1;
+
+    let mut m: usize;
+    while lo <= hi && hi > 1 {
+        m = (hi + lo) / 2;
+        if sorted_fitness_with_i[m].0 > target_f {
+            lo = m + 1;
+        } else if sorted_fitness_with_i[m].0 < target_f {
+            hi = m - 1;
+        }
+    }
+
+    if lo == 0 {
+        if (&sorted_fitness_with_i[0].0 - target_f).abs() < (sorted_fitness_with_i[1].0 - target_f).abs() {
+            return &sorted_fitness_with_i[0];
+        } else {
+            return &sorted_fitness_with_i[1];
+        }
+    }
+    if hi == sorted_fitness_with_i.len() - 1 {
+        if (&sorted_fitness_with_i[hi].0 - target_f).abs() < (sorted_fitness_with_i[hi-1].0 - target_f).abs() {
+            return &sorted_fitness_with_i[hi];
+        } else {
+            return &sorted_fitness_with_i[hi-1];
+        }
+    }
+
+    if (sorted_fitness_with_i[lo].0 - target_f).abs() < (sorted_fitness_with_i[hi].0 - target_f) {
+        return &sorted_fitness_with_i[lo];
+    } else {
+        return &sorted_fitness_with_i[hi];
+    }
+}
+
+// Fitness Uniform Optimization
+// https://arxiv.org/abs/cs/0610126
+pub(crate) fn fitness_uniform_select(sorted_fitness_with_i: &Vec<(f64, usize)>) -> usize {
+    let min_fit = -50.0;
+    let max_fit = 0.0;
+
+    let f: f64 = thread_rng().gen::<f64>() * (max_fit - min_fit) + min_fit;
+
+    let i = binary_search(sorted_fitness_with_i, f).1;
+    return i;
 }
 
 pub(crate) fn create_offspring(
