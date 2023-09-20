@@ -39,25 +39,18 @@ def update1(val):
     global x
     x = val
     run_ik()
-
-    print("update 1")
-
     draw_hubert(ax)
 
 def update2(val):
     global y
     y = val
     run_ik()
-    print("update 1")
-
     draw_hubert(ax)
 
 def update3(val):
     global z
     z = val
     run_ik()
-    print("update 1")
-
     draw_hubert(ax)
 
 def draw_hubert(ax):

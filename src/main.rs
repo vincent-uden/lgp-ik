@@ -56,6 +56,14 @@ enum Commands {
         z: f64,
         genome: Option<PathBuf>,
     },
+    FK {
+        #[clap(allow_hyphen_values(true))]
+        th_1: f64,
+        #[clap(allow_hyphen_values(true))]
+        th_2: f64,
+        #[clap(allow_hyphen_values(true))]
+        th_3: f64,
+    },
     Inspect {
         genome: PathBuf,
     },
@@ -108,7 +116,7 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
 
     let mut p = init_population(n, 10, chromo_max);
 
-    let test_angles = generate_test_angles(5, 5, 5);
+    let test_angles = generate_test_angles(10, 3, 3);
     let n_angles = test_angles.len() as f64;
 
     // (best, mean, median) fitness
@@ -161,7 +169,7 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
         }
 
         // Elitism
-        // new_pop[0] = p[fit_with_i[0].1].clone();
+        new_pop[0] = p[fit_with_i[0].1].clone();
         p = new_pop;
         historical_fitness.push((fit_with_i[0].0 / n_angles, mean(&fit_with_i) / n_angles, median(&fit_with_i) / n_angles));
         bar.set_message(format!(
@@ -246,8 +254,19 @@ fn inspect(genome: PathBuf) -> io::Result<()> {
         println!("{:?}", chromo);
     }
 
+    println!("Genome consists of: {} chromosomes", individual.len());
+
     return Ok(());
 }
+
+fn fk(th_1: f64, th_2: f64, th_3: f64) -> io::Result<()> {
+    let (x, y, z) = ee_pos(th_1, th_2, th_3);
+
+    println!("{} {} {}", x, y, z);
+
+    return Ok(());
+}
+
 
 fn main() -> io::Result<()> {
     let args = Cli::parse();
@@ -256,6 +275,7 @@ fn main() -> io::Result<()> {
         Commands::Train { generations, population, selection, chromo_max } => train(generations, population, selection, chromo_max)?,
         Commands::IK { x, y, z, genome } => ik(x, y, z, genome)?,
         Commands::Inspect { genome } => inspect(genome)?,
+        Commands::FK { th_1, th_2, th_3 } => fk(th_1, th_2, th_3)?,
     }
 
     return Ok(());
