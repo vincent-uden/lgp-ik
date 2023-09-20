@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use crate::fk::{L2, L3, L4, L5, L6, L7, L8, L9};
 use rand::{distributions::Standard, prelude::Distribution, thread_rng, Rng};
 use rayon::prelude::*;
@@ -18,7 +20,7 @@ pub(crate) enum Op {
 
 impl Distribution<Op> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Op {
-        return num_to_op(rng.gen_range(0..7));
+        return num_to_op(rng.gen_range(0..8));
     }
 }
 
@@ -45,11 +47,11 @@ pub(crate) fn num_to_op(n: usize) -> Op {
         5 => Op::COS,
         6 => Op::SQT,
         7 => Op::ATAN,
-        _ => Op::ADD,
+        _ => Op::ATAN,
     };
 }
 
-pub(crate) static CONST_REGS: usize = 10;
+pub(crate) static CONST_REGS: usize = 13;
 pub(crate) static VAR_REGS: usize = 10;
 
 #[derive(Debug, Clone, Copy)]
@@ -81,10 +83,10 @@ pub(crate) fn execute(regs: &mut [f64], genome: &[Chromosome]) {
     }
 }
 
-pub(crate) fn init_registers(th_1: f64, th_2: f64, th_3: f64) -> Vec<f64> {
+pub(crate) fn init_registers(x: f64, y: f64, z: f64) -> Vec<f64> {
     let mut output = Vec::with_capacity(CONST_REGS + VAR_REGS);
     output.push(1.0);
-    output.push(0.5);
+    output.push(PI);
     output.push(L2);
     output.push(L3);
     output.push(L4);
@@ -93,10 +95,10 @@ pub(crate) fn init_registers(th_1: f64, th_2: f64, th_3: f64) -> Vec<f64> {
     output.push(L7);
     output.push(L8);
     output.push(L9);
-    output.push(th_1);
-    output.push(th_2);
-    output.push(th_3);
-    for _ in (CONST_REGS)..(CONST_REGS + VAR_REGS - 3) {
+    output.push(x);
+    output.push(y);
+    output.push(z);
+    for _ in (CONST_REGS)..(CONST_REGS + VAR_REGS - 0) {
         output.push(0.0);
     }
     return output;
@@ -144,6 +146,7 @@ pub(crate) fn evaluate_population_par(
                 regs[CONST_REGS + 2],
             );
             error += ((x - x_p).powi(2) + (y - y_p).powi(2) + (z - z_p).powi(2)).sqrt();
+                // + individual.len() as f64 / 500.0;
         }
         return -error;
     });
@@ -163,7 +166,10 @@ pub(crate) fn tournament_select(
     return sorted_fitness_with_i[i].1;
 }
 
-pub(crate) fn binary_search(sorted_fitness_with_i: &Vec<(f64, usize)>, target_f: f64) -> &(f64, usize) {
+pub(crate) fn binary_search(
+    sorted_fitness_with_i: &Vec<(f64, usize)>,
+    target_f: f64,
+) -> &(f64, usize) {
     let mut lo = 0;
     let mut hi = sorted_fitness_with_i.len() - 1;
 
@@ -178,17 +184,21 @@ pub(crate) fn binary_search(sorted_fitness_with_i: &Vec<(f64, usize)>, target_f:
     }
 
     if lo == 0 {
-        if (&sorted_fitness_with_i[0].0 - target_f).abs() < (sorted_fitness_with_i[1].0 - target_f).abs() {
+        if (&sorted_fitness_with_i[0].0 - target_f).abs()
+            < (sorted_fitness_with_i[1].0 - target_f).abs()
+        {
             return &sorted_fitness_with_i[0];
         } else {
             return &sorted_fitness_with_i[1];
         }
     }
     if hi == sorted_fitness_with_i.len() - 1 {
-        if (&sorted_fitness_with_i[hi].0 - target_f).abs() < (sorted_fitness_with_i[hi-1].0 - target_f).abs() {
+        if (&sorted_fitness_with_i[hi].0 - target_f).abs()
+            < (sorted_fitness_with_i[hi - 1].0 - target_f).abs()
+        {
             return &sorted_fitness_with_i[hi];
         } else {
-            return &sorted_fitness_with_i[hi-1];
+            return &sorted_fitness_with_i[hi - 1];
         }
     }
 
@@ -202,6 +212,8 @@ pub(crate) fn binary_search(sorted_fitness_with_i: &Vec<(f64, usize)>, target_f:
 // Fitness Uniform Optimization
 // https://arxiv.org/abs/cs/0610126
 pub(crate) fn fitness_uniform_select(sorted_fitness_with_i: &Vec<(f64, usize)>) -> usize {
+    //let min_fit = sorted_fitness_with_i.first().unwrap().0 - 5.0;
+    //let max_fit = sorted_fitness_with_i.last().unwrap().0 + 5.0;
     let min_fit = -50.0;
     let max_fit = 0.0;
 
@@ -216,8 +228,8 @@ pub(crate) fn create_offspring(
     parent2: &Vec<Chromosome>,
     p_cross: f64,
     p_mut: f64,
+    max_len: usize,
 ) -> (Vec<Chromosome>, Vec<Chromosome>) {
-    const MAX_LEN: usize = 100;
     let mut child1 = (*parent1).clone();
     let mut child2 = (*parent2).clone();
 
@@ -236,8 +248,8 @@ pub(crate) fn create_offspring(
         child1 = tmp1;
         child2 = tmp2;
 
-        child1.truncate(MAX_LEN);
-        child2.truncate(MAX_LEN);
+        child1.truncate(max_len);
+        child2.truncate(max_len);
     }
 
     for i in 0..child1.len() {
