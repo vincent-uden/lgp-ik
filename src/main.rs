@@ -10,8 +10,8 @@ use fk::ee_pos;
 use lgp::{execute, init_registers, num_to_op, CONST_REGS};
 
 use crate::lgp::{
-    create_offspring, evaluate_population_par, init_population, op_to_num, tournament_select,
-    Chromosome, fitness_uniform_select,
+    create_offspring, evaluate_population_par, fitness_uniform_select, init_population, op_to_num,
+    tournament_select, Chromosome,
 };
 
 mod fk;
@@ -19,8 +19,8 @@ mod lgp;
 
 #[derive(clap::ValueEnum, Clone, Copy)]
 enum LGPSelection {
-    TOURNAMENT,
-    FUSS,
+    Tournament,
+    Fuss,
 }
 
 #[derive(Parser)]
@@ -69,7 +69,11 @@ enum Commands {
     },
 }
 
-pub(crate) fn generate_test_angles(steps1: usize, steps2: usize, steps3: usize) -> Vec<(f64, f64, f64)> {
+pub(crate) fn generate_test_angles(
+    steps1: usize,
+    steps2: usize,
+    steps3: usize,
+) -> Vec<(f64, f64, f64)> {
     let mut output = Vec::with_capacity(steps1 * steps2 * steps3);
 
     for i in 0..steps1 {
@@ -84,33 +88,40 @@ pub(crate) fn generate_test_angles(steps1: usize, steps2: usize, steps3: usize) 
         }
     }
 
-    return output;
+    output
 }
 
 fn smooth_step(x: f64, from: f64, to: f64) -> f64 {
     let out = (x - from) / (to - from);
-    return out * out * (3.0 - 2.0 * out);
+    out * out * (3.0 - 2.0 * out)
 }
 
-fn mean(x: &[(f64,usize)]) -> f64 {
+fn mean(x: &[(f64, usize)]) -> f64 {
     let mut output = 0.0;
-    for (y,_) in x {
+    for (y, _) in x {
         output += y;
     }
-    return output / (x.len() as f64);
+    output / (x.len() as f64)
 }
 
-fn median(fitness_with_index: &[(f64,usize)]) -> f64 {
+fn median(fitness_with_index: &[(f64, usize)]) -> f64 {
     if fitness_with_index.len() % 2 == 1 {
-        return fitness_with_index[fitness_with_index.len() / 2].0;
+        fitness_with_index[fitness_with_index.len() / 2].0
     } else {
-        return (fitness_with_index[fitness_with_index.len() / 2].0 + fitness_with_index[fitness_with_index.len() / 2 - 1].0) / 2.0;
+        (fitness_with_index[fitness_with_index.len() / 2].0
+            + fitness_with_index[fitness_with_index.len() / 2 - 1].0)
+            / 2.0
     }
 }
 
-fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<LGPSelection>, cli_chromo_max: Option<usize>) -> io::Result<()> {
+fn train(
+    cli_gens: Option<usize>,
+    cli_pop: Option<usize>,
+    cli_selection: Option<LGPSelection>,
+    cli_chromo_max: Option<usize>,
+) -> io::Result<()> {
     let gens = cli_gens.unwrap_or(500);
-    let selection = cli_selection.unwrap_or(LGPSelection::TOURNAMENT);
+    let selection = cli_selection.unwrap_or(LGPSelection::Tournament);
     let n = cli_pop.unwrap_or(1000);
     let chromo_max = cli_chromo_max.unwrap_or(100);
 
@@ -120,7 +131,7 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
     let n_angles = test_angles.len() as f64;
 
     // (best, mean, median) fitness
-    let mut historical_fitness: Vec<(f64,f64,f64)> = Vec::with_capacity(gens);
+    let mut historical_fitness: Vec<(f64, f64, f64)> = Vec::with_capacity(gens);
 
     let bar = ProgressBar::new(gens as u64);
     bar.set_style(
@@ -136,7 +147,7 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
         let fitness = evaluate_population_par(&p, &test_angles);
         let mut fit_with_i: Vec<(f64, usize)> = fitness.into_iter().zip(0..n).collect();
         fit_with_i.sort_by(|a, b| {
-            return b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal);
+            b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let mut new_pop = Vec::with_capacity(n);
@@ -145,21 +156,21 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
             .into_par_iter()
             .map(|_| {
                 let parent1 = match selection {
-                    LGPSelection::TOURNAMENT => &p[tournament_select(&fit_with_i, 5, 0.8)],
-                    LGPSelection::FUSS => &p[fitness_uniform_select(&fit_with_i)],
+                    LGPSelection::Tournament => &p[tournament_select(&fit_with_i, 5, 0.8)],
+                    LGPSelection::Fuss => &p[fitness_uniform_select(&fit_with_i)],
                 };
                 let parent2 = match selection {
-                    LGPSelection::TOURNAMENT => &p[tournament_select(&fit_with_i, 5, 0.8)],
-                    LGPSelection::FUSS => &p[fitness_uniform_select(&fit_with_i)],
+                    LGPSelection::Tournament => &p[tournament_select(&fit_with_i, 5, 0.8)],
+                    LGPSelection::Fuss => &p[fitness_uniform_select(&fit_with_i)],
                 };
 
-                return create_offspring(
+                create_offspring(
                     parent1,
                     parent2,
                     smooth_step(g as f64 / gens as f64, 0.9, 0.4),
                     smooth_step(g as f64 / gens as f64, 0.8, 0.15),
                     chromo_max,
-                );
+                )
             })
             .collect();
 
@@ -171,7 +182,11 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
         // Elitism
         new_pop[0] = p[fit_with_i[0].1].clone();
         p = new_pop;
-        historical_fitness.push((fit_with_i[0].0 / n_angles, mean(&fit_with_i) / n_angles, median(&fit_with_i) / n_angles));
+        historical_fitness.push((
+            fit_with_i[0].0 / n_angles,
+            mean(&fit_with_i) / n_angles,
+            median(&fit_with_i) / n_angles,
+        ));
         bar.set_message(format!(
             "Mean error: {:.5} cm",
             (fit_with_i[0].0 / (test_angles.len() as f64) * (-100.0))
@@ -199,7 +214,7 @@ fn train(cli_gens: Option<usize>, cli_pop: Option<usize>, cli_selection: Option<
     }
     writeln!(genome_file)?;
 
-    return Ok(());
+    Ok(())
 }
 
 fn read_genome(path: &Path) -> io::Result<Vec<Chromosome>> {
@@ -211,9 +226,7 @@ fn read_genome(path: &Path) -> io::Result<Vec<Chromosome>> {
 
     let encoded: Vec<usize> = contents
         .split(", ")
-        .map(|x| {
-            x.parse().unwrap_or(0)
-        })
+        .map(|x| x.parse().unwrap_or(0))
         .collect::<Vec<usize>>();
 
     for i in 0..((encoded.len() - 1) / 4) {
@@ -225,7 +238,7 @@ fn read_genome(path: &Path) -> io::Result<Vec<Chromosome>> {
         });
     }
 
-    return Ok(individual);
+    Ok(individual)
 }
 
 fn ik(x: f64, y: f64, z: f64, genome: Option<PathBuf>) -> io::Result<()> {
@@ -237,14 +250,14 @@ fn ik(x: f64, y: f64, z: f64, genome: Option<PathBuf>) -> io::Result<()> {
     execute(&mut regs, &individual);
 
     let (x_p, y_p, z_p) = ee_pos(
-        regs[CONST_REGS + 0],
+        regs[CONST_REGS],
         regs[CONST_REGS + 1],
         regs[CONST_REGS + 2],
     );
 
     println!("{} {} {}", x_p, y_p, z_p);
 
-    return Ok(());
+    Ok(())
 }
 
 fn inspect(genome: PathBuf) -> io::Result<()> {
@@ -256,7 +269,7 @@ fn inspect(genome: PathBuf) -> io::Result<()> {
 
     println!("Genome consists of: {} chromosomes", individual.len());
 
-    return Ok(());
+    Ok(())
 }
 
 fn fk(th_1: f64, th_2: f64, th_3: f64) -> io::Result<()> {
@@ -264,26 +277,33 @@ fn fk(th_1: f64, th_2: f64, th_3: f64) -> io::Result<()> {
 
     println!("{} {} {}", x, y, z);
 
-    return Ok(());
+    Ok(())
 }
-
 
 fn main() -> io::Result<()> {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Train { generations, population, selection, chromo_max } => train(generations, population, selection, chromo_max)?,
+        Commands::Train {
+            generations,
+            population,
+            selection,
+            chromo_max,
+        } => train(generations, population, selection, chromo_max)?,
         Commands::IK { x, y, z, genome } => ik(x, y, z, genome)?,
         Commands::Inspect { genome } => inspect(genome)?,
         Commands::FK { th_1, th_2, th_3 } => fk(th_1, th_2, th_3)?,
     }
 
-    return Ok(());
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{lgp::{binary_search, init_registers, execute}, median, generate_test_angles, fk::ee_pos};
+    use crate::{
+        lgp::{binary_search, execute, init_registers},
+        median,
+    };
 
     #[test]
     fn binary_search_finds_closest_match() {
@@ -301,8 +321,8 @@ mod tests {
 
     #[test]
     fn median_selects_correct_entry() {
-        let inp1: Vec<(f64,usize)> = (0..10).map(|x| (x as f64, x)).collect();
-        let inp2: Vec<(f64,usize)> = (0..11).map(|x| (x as f64, x)).collect();
+        let inp1: Vec<(f64, usize)> = (0..10).map(|x| (x as f64, x)).collect();
+        let inp2: Vec<(f64, usize)> = (0..11).map(|x| (x as f64, x)).collect();
 
         assert_eq!(median(&inp1), 4.5, "Even length list");
         assert_eq!(median(&inp2), 5.0, "Odd length list");

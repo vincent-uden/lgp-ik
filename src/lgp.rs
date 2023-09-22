@@ -8,47 +8,47 @@ use crate::fk::ee_pos;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Op {
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    SIN,
-    COS,
-    SQT,
-    ATAN,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Sin,
+    Cos,
+    Sqrt,
+    Atan,
 }
 
 impl Distribution<Op> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Op {
-        return num_to_op(rng.gen_range(0..8));
+        num_to_op(rng.gen_range(0..8))
     }
 }
 
 pub(crate) fn op_to_num(op: Op) -> usize {
-    return match op {
-        Op::ADD => 0,
-        Op::SUB => 1,
-        Op::MUL => 2,
-        Op::DIV => 3,
-        Op::SIN => 4,
-        Op::COS => 5,
-        Op::SQT => 6,
-        Op::ATAN => 7,
-    };
+    match op {
+        Op::Add => 0,
+        Op::Sub => 1,
+        Op::Mul => 2,
+        Op::Div => 3,
+        Op::Sin => 4,
+        Op::Cos => 5,
+        Op::Sqrt => 6,
+        Op::Atan => 7,
+    }
 }
 
 pub(crate) fn num_to_op(n: usize) -> Op {
-    return match n {
-        0 => Op::ADD,
-        1 => Op::SUB,
-        2 => Op::MUL,
-        3 => Op::DIV,
-        4 => Op::SIN,
-        5 => Op::COS,
-        6 => Op::SQT,
-        7 => Op::ATAN,
-        _ => Op::ATAN,
-    };
+    match n {
+        0 => Op::Add,
+        1 => Op::Sub,
+        2 => Op::Mul,
+        3 => Op::Div,
+        4 => Op::Sin,
+        5 => Op::Cos,
+        6 => Op::Sqrt,
+        7 => Op::Atan,
+        _ => Op::Atan,
+    }
 }
 
 pub(crate) static CONST_REGS: usize = 13;
@@ -64,21 +64,20 @@ pub(crate) struct Chromosome {
 
 fn safe_div(x: f64, y: f64) -> f64 {
     let divisor: f64 = if y == 0.0 { 0.0000001 } else { y };
-
-    return x / divisor;
+    x / divisor
 }
 
 pub(crate) fn execute(regs: &mut [f64], genome: &[Chromosome]) {
     for chromo in genome {
         regs[chromo.dest] = match chromo.operator {
-            Op::ADD => regs[chromo.src1] + regs[chromo.src2],
-            Op::SUB => regs[chromo.src1] - regs[chromo.src2],
-            Op::MUL => regs[chromo.src1] * regs[chromo.src2],
-            Op::DIV => safe_div(regs[chromo.src1], regs[chromo.src2]),
-            Op::SIN => regs[chromo.src1].sin(),
-            Op::COS => regs[chromo.src1].cos(),
-            Op::SQT => regs[chromo.src1].abs().sqrt(),
-            Op::ATAN => regs[chromo.src1].atan2(regs[chromo.src2]),
+            Op::Add => regs[chromo.src1] + regs[chromo.src2],
+            Op::Sub => regs[chromo.src1] - regs[chromo.src2],
+            Op::Mul => regs[chromo.src1] * regs[chromo.src2],
+            Op::Div => safe_div(regs[chromo.src1], regs[chromo.src2]),
+            Op::Sin => regs[chromo.src1].sin(),
+            Op::Cos => regs[chromo.src1].cos(),
+            Op::Sqrt => regs[chromo.src1].abs().sqrt(),
+            Op::Atan => regs[chromo.src1].atan2(regs[chromo.src2]),
         }
     }
 }
@@ -98,10 +97,8 @@ pub(crate) fn init_registers(x: f64, y: f64, z: f64) -> Vec<f64> {
     output.push(x);
     output.push(y);
     output.push(z);
-    for _ in (CONST_REGS)..(CONST_REGS + VAR_REGS - 0) {
-        output.push(0.0);
-    }
-    return output;
+    output.resize(CONST_REGS + VAR_REGS, 0.0);
+    output
 }
 
 pub(crate) fn init_population(
@@ -125,7 +122,7 @@ pub(crate) fn init_population(
         population.push(individual);
     }
 
-    return population;
+    population
 }
 
 pub(crate) fn evaluate_population_par(
@@ -140,18 +137,15 @@ pub(crate) fn evaluate_population_par(
             let mut regs = init_registers(x, y, z);
             execute(&mut regs, individual);
 
-            let (x_p, y_p, z_p) = ee_pos(
-                regs[CONST_REGS + 0],
-                regs[CONST_REGS + 1],
-                regs[CONST_REGS + 2],
-            );
+            let (x_p, y_p, z_p) =
+                ee_pos(regs[CONST_REGS], regs[CONST_REGS + 1], regs[CONST_REGS + 2]);
             error += ((x - x_p).powi(2) + (y - y_p).powi(2) + (z - z_p).powi(2)).sqrt();
-                // + individual.len() as f64 / 500.0;
+            // + individual.len() as f64 / 500.0;
         }
-        return -error;
+        -error
     });
 
-    return fitness.collect();
+    fitness.collect()
 }
 
 pub(crate) fn tournament_select(
@@ -163,7 +157,7 @@ pub(crate) fn tournament_select(
     while thread_rng().gen::<f64>() < p_tour && i < t_size && i < sorted_fitness_with_i.len() {
         i += 1;
     }
-    return sorted_fitness_with_i[i].1;
+    sorted_fitness_with_i[i].1
 }
 
 pub(crate) fn binary_search(
@@ -184,7 +178,7 @@ pub(crate) fn binary_search(
     }
 
     if lo == 0 {
-        if (&sorted_fitness_with_i[0].0 - target_f).abs()
+        if (sorted_fitness_with_i[0].0 - target_f).abs()
             < (sorted_fitness_with_i[1].0 - target_f).abs()
         {
             return &sorted_fitness_with_i[0];
@@ -193,7 +187,7 @@ pub(crate) fn binary_search(
         }
     }
     if hi == sorted_fitness_with_i.len() - 1 {
-        if (&sorted_fitness_with_i[hi].0 - target_f).abs()
+        if (sorted_fitness_with_i[hi].0 - target_f).abs()
             < (sorted_fitness_with_i[hi - 1].0 - target_f).abs()
         {
             return &sorted_fitness_with_i[hi];
@@ -203,9 +197,9 @@ pub(crate) fn binary_search(
     }
 
     if (sorted_fitness_with_i[lo].0 - target_f).abs() < (sorted_fitness_with_i[hi].0 - target_f) {
-        return &sorted_fitness_with_i[lo];
+        &sorted_fitness_with_i[lo]
     } else {
-        return &sorted_fitness_with_i[hi];
+        &sorted_fitness_with_i[hi]
     }
 }
 
@@ -219,8 +213,7 @@ pub(crate) fn fitness_uniform_select(sorted_fitness_with_i: &Vec<(f64, usize)>) 
 
     let f: f64 = thread_rng().gen::<f64>() * (max_fit - min_fit) + min_fit;
 
-    let i = binary_search(sorted_fitness_with_i, f).1;
-    return i;
+    binary_search(sorted_fitness_with_i, f).1
 }
 
 pub(crate) fn create_offspring(
@@ -252,11 +245,11 @@ pub(crate) fn create_offspring(
         child2.truncate(max_len);
     }
 
-    for i in 0..child1.len() {
+    for chromo in &mut child1 {
         if rng.gen::<f64>() < p_mut {
             match rng.gen_range(0..3) {
                 0 => {
-                    child1[i].operator = rng.gen();
+                    chromo.operator = rng.gen();
                 }
                 1 => {
                     rng.gen_range(CONST_REGS..(CONST_REGS + VAR_REGS));
@@ -271,5 +264,5 @@ pub(crate) fn create_offspring(
         }
     }
 
-    return (child1, child2);
+    (child1, child2)
 }
