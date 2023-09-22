@@ -1,3 +1,5 @@
 /target
 genome.txt
 log.txt
+meta_best_genome.txt
+meta_best_log.txt

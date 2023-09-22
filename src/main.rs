@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::{f64::consts::PI, fs::File, io};
@@ -5,6 +6,7 @@ use std::{f64::consts::PI, fs::File, io};
 use clap::{ArgAction, Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use colored::Colorize;
 
 use fk::ee_pos;
 use lgp::{execute, init_registers, num_to_op, CONST_REGS};
@@ -45,7 +47,10 @@ enum Commands {
         population: Option<usize>,
         #[clap(short, long)]
         chromo_max: Option<usize>,
+        #[clap(short, long)]
         selection: Option<LGPSelection>,
+        #[clap(short, long)]
+        meta_iters: Option<usize>,
     },
     IK {
         #[clap(allow_hyphen_values(true))]
@@ -119,7 +124,7 @@ fn train(
     cli_pop: Option<usize>,
     cli_selection: Option<LGPSelection>,
     cli_chromo_max: Option<usize>,
-) -> io::Result<()> {
+) -> io::Result<f64> {
     let gens = cli_gens.unwrap_or(500);
     let selection = cli_selection.unwrap_or(LGPSelection::Tournament);
     let n = cli_pop.unwrap_or(1000);
@@ -214,7 +219,34 @@ fn train(
     }
     writeln!(genome_file)?;
 
-    Ok(())
+    Ok(historical_fitness.last().unwrap_or(&(100.0, 100.0, 100.0)).0)
+}
+
+fn meta_train(
+    cli_gens: Option<usize>,
+    cli_pop: Option<usize>,
+    cli_selection: Option<LGPSelection>,
+    cli_chromo_max: Option<usize>,
+    meta_iters: usize,
+) -> io::Result<f64> {
+    let mut best_fitness = -10000.0;
+
+    for m in 0..meta_iters {
+        println!("{}", format!("--- Meta Training Iteration {}/{} ---", m + 1, meta_iters).bold());
+        let fitness = train(cli_gens, cli_pop, cli_selection, cli_chromo_max)?;
+        println!("Resulting best fitness: {:.5} cm", fitness.abs() * 100.0);
+
+        if fitness > best_fitness {
+            fs::copy("log.txt", "meta_best_log.txt")?;
+            fs::copy("genome.txt", "meta_best_genome.txt")?;
+            best_fitness = fitness;
+            println!("{}", format!("New fitness found: {:.5} cm", best_fitness.abs() * 100.0).green());
+        }
+
+        println!(" ");
+    }
+
+    Ok(best_fitness)
 }
 
 fn read_genome(path: &Path) -> io::Result<Vec<Chromosome>> {
@@ -289,7 +321,13 @@ fn main() -> io::Result<()> {
             population,
             selection,
             chromo_max,
-        } => train(generations, population, selection, chromo_max)?,
+            meta_iters,
+        } => {
+            match meta_iters {
+                Some(iterations) => meta_train(generations, population, selection, chromo_max, iterations)?,
+                None => train(generations, population, selection, chromo_max)?,
+            };
+        },
         Commands::IK { x, y, z, genome } => ik(x, y, z, genome)?,
         Commands::Inspect { genome } => inspect(genome)?,
         Commands::FK { th_1, th_2, th_3 } => fk(th_1, th_2, th_3)?,
@@ -297,6 +335,7 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
+
 
 #[cfg(test)]
 mod tests {
