@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the CSV file into a DataFrame
-csv_file = '/media/hdd/github/lgp-ik/log.txt'  # Replace with your CSV file's path
+csv_file = '../log.txt'  # Replace with your CSV file's path
 df = pd.read_csv(csv_file)
 
 # Extract data from the DataFrame

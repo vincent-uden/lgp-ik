@@ -140,7 +140,6 @@ pub(crate) fn evaluate_population_par(
             let (x_p, y_p, z_p) =
                 ee_pos(regs[CONST_REGS], regs[CONST_REGS + 1], regs[CONST_REGS + 2]);
             error += ((x - x_p).powi(2) + (y - y_p).powi(2) + (z - z_p).powi(2)).sqrt();
-            // + individual.len() as f64 / 500.0;
         }
         -error
     });

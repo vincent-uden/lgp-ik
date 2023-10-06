@@ -80,7 +80,9 @@ def draw_hubert(ax):
     ax.set_ylim(-0.18, 0.40)
     ax.set_zlim(0, 0.7)
 
+    error = np.sqrt((hand_pos[0] - goal_pos[0])**2 + (hand_pos[1] - goal_pos[1])**2 + (hand_pos[2] - goal_pos[2])**2)
     ax.legend([f"x: {x:.2f}, y:{y:.2f}, z:{z:.2f}", f"th_1: {th_1 * 180 / np.pi:.2f} th_2: {th_2 * 180 / np.pi:.2f} th_3: {th_3 * 180 / np.pi:.2f}"])
+    ax.set_title(f"{error}")
 
 if __name__ == "__main__":
     fig.subplots_adjust(bottom=0.24)

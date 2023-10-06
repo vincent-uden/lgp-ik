@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 use std::{f64::consts::PI, fs::File, io};
 
 use clap::{ArgAction, Parser, Subcommand};
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use colored::Colorize;
 
 use fk::ee_pos;
 use lgp::{execute, init_registers, num_to_op, CONST_REGS};
@@ -132,7 +132,7 @@ fn train(
 
     let mut p = init_population(n, 10, chromo_max);
 
-    let test_angles = generate_test_angles(10, 3, 3);
+    let test_angles = generate_test_angles(10, 5, 5);
     let n_angles = test_angles.len() as f64;
 
     // (best, mean, median) fitness
@@ -151,9 +151,7 @@ fn train(
         bar.inc(1);
         let fitness = evaluate_population_par(&p, &test_angles);
         let mut fit_with_i: Vec<(f64, usize)> = fitness.into_iter().zip(0..n).collect();
-        fit_with_i.sort_by(|a, b| {
-            b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        fit_with_i.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         let mut new_pop = Vec::with_capacity(n);
 
@@ -219,7 +217,10 @@ fn train(
     }
     writeln!(genome_file)?;
 
-    Ok(historical_fitness.last().unwrap_or(&(100.0, 100.0, 100.0)).0)
+    Ok(historical_fitness
+        .last()
+        .unwrap_or(&(100.0, 100.0, 100.0))
+        .0)
 }
 
 fn meta_train(
@@ -232,7 +233,10 @@ fn meta_train(
     let mut best_fitness = -10000.0;
 
     for m in 0..meta_iters {
-        println!("{}", format!("--- Meta Training Iteration {}/{} ---", m + 1, meta_iters).bold());
+        println!(
+            "{}",
+            format!("--- Meta Training Iteration {}/{} ---", m + 1, meta_iters).bold()
+        );
         let fitness = train(cli_gens, cli_pop, cli_selection, cli_chromo_max)?;
         println!("Resulting best fitness: {:.5} cm", fitness.abs() * 100.0);
 
@@ -240,7 +244,10 @@ fn meta_train(
             fs::copy("log.txt", "meta_best_log.txt")?;
             fs::copy("genome.txt", "meta_best_genome.txt")?;
             best_fitness = fitness;
-            println!("{}", format!("New fitness found: {:.5} cm", best_fitness.abs() * 100.0).green());
+            println!(
+                "{}",
+                format!("New fitness found: {:.5} cm", best_fitness.abs() * 100.0).green()
+            );
         }
 
         println!(" ");
@@ -281,13 +288,12 @@ fn ik(x: f64, y: f64, z: f64, genome: Option<PathBuf>) -> io::Result<()> {
     let mut regs = init_registers(x, y, z);
     execute(&mut regs, &individual);
 
-    let (x_p, y_p, z_p) = ee_pos(
+    println!(
+        "{} {} {}",
         regs[CONST_REGS],
         regs[CONST_REGS + 1],
-        regs[CONST_REGS + 2],
+        regs[CONST_REGS + 2]
     );
-
-    println!("{} {} {}", x_p, y_p, z_p);
 
     Ok(())
 }
@@ -324,10 +330,12 @@ fn main() -> io::Result<()> {
             meta_iters,
         } => {
             match meta_iters {
-                Some(iterations) => meta_train(generations, population, selection, chromo_max, iterations)?,
+                Some(iterations) => {
+                    meta_train(generations, population, selection, chromo_max, iterations)?
+                }
                 None => train(generations, population, selection, chromo_max)?,
             };
-        },
+        }
         Commands::IK { x, y, z, genome } => ik(x, y, z, genome)?,
         Commands::Inspect { genome } => inspect(genome)?,
         Commands::FK { th_1, th_2, th_3 } => fk(th_1, th_2, th_3)?,
@@ -335,7 +343,6 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
