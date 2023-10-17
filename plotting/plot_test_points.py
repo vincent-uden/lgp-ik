@@ -6,9 +6,9 @@ from matplotlib import pyplot as plt
 # Define the range and number of steps
 start = 0
 end = np.pi
-num_steps1 = 10  # Adjust the number of steps as needed
-num_steps2 = 3  # Adjust the number of steps as needed
-num_steps3 = 3  # Adjust the number of steps as needed
+num_steps1 = 8  # Adjust the number of steps as needed
+num_steps2 = 8  # Adjust the number of steps as needed
+num_steps3 = 8  # Adjust the number of steps as needed
 
 points = []
 

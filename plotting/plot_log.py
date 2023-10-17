@@ -12,7 +12,7 @@ mean_fitness = df['mean_fitness']
 median_fitness = df['median_fitness']
 
 # Create a plot
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(6, 4))
 plt.plot(generation, best_fitness, label='Best Fitness')
 plt.plot(generation, mean_fitness, label='Mean Fitness')
 plt.plot(generation, median_fitness, label='Median Fitness')

@@ -132,7 +132,7 @@ fn train(
 
     let mut p = init_population(n, 10, chromo_max);
 
-    let test_angles = generate_test_angles(10, 5, 5);
+    let test_angles = generate_test_angles(8, 8, 8);
     let n_angles = test_angles.len() as f64;
 
     // (best, mean, median) fitness
@@ -230,7 +230,7 @@ fn meta_train(
     cli_chromo_max: Option<usize>,
     meta_iters: usize,
 ) -> io::Result<f64> {
-    let mut best_fitness = -10000.0;
+    let mut best_fitness: f64 = -10000.0;
 
     for m in 0..meta_iters {
         println!(
@@ -238,7 +238,7 @@ fn meta_train(
             format!("--- Meta Training Iteration {}/{} ---", m + 1, meta_iters).bold()
         );
         let fitness = train(cli_gens, cli_pop, cli_selection, cli_chromo_max)?;
-        println!("Resulting best fitness: {:.5} cm", fitness.abs() * 100.0);
+        println!("Resulting best fitness: {:.5} cm. Best fitness so far: {:.5} cm", fitness.abs() * 100.0, best_fitness.abs() * 100.0);
 
         if fitness > best_fitness {
             fs::copy("log.txt", "meta_best_log.txt")?;
@@ -319,6 +319,8 @@ fn fk(th_1: f64, th_2: f64, th_3: f64) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
+    rayon::ThreadPoolBuilder::new().num_threads(8).build_global().unwrap();
+
     let args = Cli::parse();
 
     match args.command {
